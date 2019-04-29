@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<projectDescription>
+	<name>spark_scala</name>
+	<comment></comment>
+	<projects>
+	</projects>
+	<buildSpec>
+		<buildCommand>
+			<name>org.scala-ide.sdt.core.scalabuilder</name>
+			<arguments>
+			</arguments>
+		</buildCommand>
+	</buildSpec>
+	<natures>
+		<nature>org.scala-ide.sdt.core.scalanature</nature>
+		<nature>org.eclipse.jdt.core.javanature</nature>
+	</natures>
+	<linkedResources>
+		<link>
+			<name>doc/hadoop</name>
+			<type>2</type>
+			<location>D:/Documents/gdrive/dev/manual/hadoop</location>
+		</link>
+		<link>
+			<name>doc/scala</name>
+			<type>2</type>
+			<location>D:/Documents/gdrive/dev/manual/scala</location>
+		</link>
+		<link>
+			<name>doc/spark</name>
+			<type>2</type>
+			<location>D:/Documents/gdrive/dev/manual/spark</location>
+		</link>
+	</linkedResources>
+</projectDescription>
