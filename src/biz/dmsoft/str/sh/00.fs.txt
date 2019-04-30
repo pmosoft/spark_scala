@@ -1,8 +1,0 @@
-﻿hadoop fs -mkdir -p aa
-hadoop fs -ls -h aa
-hadoop fs -rm -f aa
-hadoop fs -put aa
-hadoop fs -cp aa bb
-hadoop fs -get aa bb
-hadoop fs -chmod -R 777 aa
-hadoop fs -appendToFile aa bb
