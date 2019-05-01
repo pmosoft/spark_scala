@@ -1,6 +1,9 @@
+package biz.dmsoft.str.etl
+
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types._
+import biz.dmsoft.str.comm.App
 
 /*
  * SparkEtl pathNm fileNm
@@ -11,6 +14,7 @@ object SparkEtl {
 
     val pathNm = args(0);
     val fileNm = args(1);
+    //var src = App.src;
 
     // $example on:init_session$
     val spark = SparkSession.builder().appName("SparkEtl").getOrCreate()
@@ -40,4 +44,5 @@ object SparkEtl {
     // $example on:create_df$
     val df = spark.read.json("examples/src/main/resources/people.json")
   }
+
 }
