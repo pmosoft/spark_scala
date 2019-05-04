@@ -6,6 +6,7 @@ mkdir app
 mkdir app/str
 mkdir app/str/bin
 mkdir app/str/data
+mkdir app/str/data/entity
 mkdir app/str/sh
 mkdir app/str/src
 mkdir data
