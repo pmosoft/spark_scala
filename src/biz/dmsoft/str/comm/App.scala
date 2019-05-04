@@ -1,6 +1,7 @@
 package biz.dmsoft.str.comm
 
 object App {
-  val parquetPath = ""
-  val hivePath = ""
+  val localPath   = "/home/str/data/entity/"
+  val parquetPath = "/user/str/entity/parquet/"
+  val hivePath    = "/user/str/entity/hive/"
 }
