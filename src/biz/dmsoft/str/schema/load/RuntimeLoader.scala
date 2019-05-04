@@ -17,6 +17,7 @@ object RuntimeLoader {
     val method = im.symbol.info.decl(universe.TermName("schema")).asMethod
     val objMirror = runtimeMirror.reflect(im.instance)
     val schema = objMirror.reflectMethod(method)().asInstanceOf[StructType]
+    return schema
   }
 
 }
