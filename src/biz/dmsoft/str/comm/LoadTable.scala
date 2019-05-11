@@ -14,6 +14,7 @@ val tabNm   = "TSTRTRN001";
 val baseDt = "20190504";
 LoadTable.parquetDayPartition(spark, tabNm, baseDt)
 
+spark.sql("SELECT * FROM TSTRTRN001").show()
  * */
 object LoadTable {
 
