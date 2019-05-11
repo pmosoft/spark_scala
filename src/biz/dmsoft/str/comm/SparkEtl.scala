@@ -1,10 +1,8 @@
-package biz.dmsoft.str.etl
+package biz.dmsoft.str.comm
 
-import org.apache.spark.sql.Row
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types._
 import biz.dmsoft.str.schema.load.RuntimeLoader
-import biz.dmsoft.str.comm.App
 import org.apache.hadoop.fs.FileSystem
 import org.apache.hadoop.fs.Path
 
