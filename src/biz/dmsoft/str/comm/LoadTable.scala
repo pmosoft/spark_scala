@@ -7,16 +7,12 @@ import org.apache.hadoop.fs.FileSystem
 import org.apache.hadoop.fs.Path
 
 /*
- * SparkEtl pathNm tabNm
-import biz.dmsoft.str.etl.SparkEtl
+
+import biz.dmsoft.str.comm.LoadTable
 
 val tabNm   = "TSTRTRN001";
-val batchDt = "20190504";
-SparkEtl.localSamToHdfsParquet(spark, tabNm, batchDt, "|")
-localSamToHdfsParquet(spark, tabNm, batchDt, "|")
-SparkEtl.test01(spark)
-SparkEtl.test02()
-test02(spark)
+val baseDt = "20190504";
+LoadTable.parquetDayPartition(spark, tabNm, baseDt)
 
  * */
 object LoadTable {
