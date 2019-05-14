@@ -19,6 +19,7 @@ object TSTRTRN001 {
       ,StructField("INOUT_CD"   ,StringType) // 입지코드
       ,StructField("INOUT_CD_NM",StringType) // 입지코드명
       ,StructField("TRAN_AMT"   ,StringType) // 거래금액
+      ,StructField("ACCT_NO"    ,StringType) // 계좌번호
       ))
 }
 

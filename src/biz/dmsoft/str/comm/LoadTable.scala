@@ -12,10 +12,20 @@ import biz.dmsoft.str.comm.LoadTable
 
 val tabNm   = "TSTRTRN001";
 val baseDt = "20190504";
+var yyyymm = "201905";
 LoadTable.parquetDayPartition(spark, tabNm, baseDt)
 
+var parquetDF = spark.sql("SELECT * FROM parquet.`"+App.parquetPath+tabNm+"/"+tabNm+"_"+yyyymm+"*`")
+var parquetDF = spark.sql("SELECT ACCT_NO FROM parquet.`"+App.parquetPath+tabNm+"/"+tabNm+"_"+yyyymm+"*`")
+parquetDF.cache().createOrReplaceTempView(tabNm);parquetDF.count()
+
+spark.sql("SELECT ACCT_NO FROM parquet.`"+App.parquetPath+tabNm+"/"+tabNm+"_"+yyyymm+"*`").show()
+spark.sql("SELECT TRAN_DT FROM parquet.`"+App.parquetPath+tabNm+"/"+tabNm+"_"+yyyymm+"*`").show()
+spark.sql("SELECT * FROM parquet.`"+App.parquetPath+tabNm+"/"+tabNm+"_"+yyyymm+"*`").show()
+spark.sql("SELECT * FROM parquet.`"+App.parquetPath+tabNm+"/"+tabNm+"_20190505`").show()
+
 spark.sql("SELECT * FROM TSTRTRN001").show()
- * */
+ */
 object LoadTable {
 
   def main(args: Array[String])   {
@@ -30,4 +40,10 @@ object LoadTable {
     val parquetDF = spark.sql("SELECT * FROM parquet.`"+App.parquetPath+tabNm+"/"+tabNm+"_"+baseDt+"`")
     parquetDF.cache().createOrReplaceTempView(tabNm);parquetDF.count()
   }
+
+  def parquetMonthPartition(spark: SparkSession, tabNm: String, yyyymm: String): Unit = {
+    val parquetDF = spark.sql("SELECT * FROM parquet.`"+App.parquetPath+tabNm+"/"+tabNm+"_"+yyyymm+"*`")
+    parquetDF.cache().createOrReplaceTempView(tabNm);parquetDF.count()
+  }
+
 }

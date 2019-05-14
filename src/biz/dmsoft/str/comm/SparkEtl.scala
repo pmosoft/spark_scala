@@ -2,16 +2,20 @@ package biz.dmsoft.str.comm
 
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types._
-import biz.dmsoft.str.schema.load.RuntimeLoader
 import org.apache.hadoop.fs.FileSystem
 import org.apache.hadoop.fs.Path
+import biz.dmsoft.str.schema.load.RuntimeLoader
+import biz.dmsoft.str.comm.App
 
 /*
  * SparkEtl pathNm tabNm
-import biz.dmsoft.str.etl.SparkEtl
+import biz.dmsoft.str.comm.SparkEtl
+import biz.dmsoft.str.comm.App
 
-val tabNm   = "TSTRTRN001";
-val batchDt = "20190504";
+var tabNm   = "TSTRTRN001";
+var batchDt = "20190505";
+var delimiter = "|";
+
 SparkEtl.localSamToHdfsParquet(spark, tabNm, batchDt, "|")
 localSamToHdfsParquet(spark, tabNm, batchDt, "|")
 SparkEtl.test01(spark)
@@ -75,9 +79,9 @@ object SparkEtl {
     val conf = spark.sparkContext.hadoopConfiguration
     val fs = FileSystem.get(conf)
     fs.delete(new Path(tar))
-    fs.mkdirs(new Path(tar))
+    //fs.mkdirs(new Path(tar))
 
-    spark.read.format("csv").option("delimiter","|").schema(schema).load("file:///"+src).write.parquet(tar)
+    //spark.read.format("csv").option("delimiter","|").schema(schema).load("file:///"+src).write.parquet(tar)
     spark.read.format("csv").option("delimiter",delimiter).schema(schema).load(src).write.parquet(tar)
   }
 
@@ -101,7 +105,6 @@ object SparkEtl {
     var partNm =  tabNm +"_"+ batchDt; if(batchDt.equals("all")) partNm =  tabNm
     var src = App.localPath + partNm + ".dat"
     var tar = App.parquetPath + partNm
-
     val df = spark.read.json("examples/src/main/resources/people.json")
   }
 

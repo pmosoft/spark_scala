@@ -10,11 +10,10 @@ import biz.dmsoft.str.comm.LoadTable
 
 /*
 
-import biz.dmsoft.str.batch.LoadTable
+import biz.dmsoft.str.batch.TranTest
+val spark  = SparkSession.builder().appName("TranTest").getOrCreate()
 
-val tabNm   = "TSTRTRN001";
-val baseDt = "20190504";
-LoadTable.parquetDayPartition(spark, tabNm, baseDt)
+TranTest.dailyTables()
 
 spark.sql("SELECT * FROM TSTRTRN001").show()
  * */
@@ -39,7 +38,7 @@ object TranTest {
 
   def executeQuery(): Unit = {
     var qry = """
-    SELECT * FROM TSTRTRAN001
+    SELECT * FROM TSTRTRN001
     """
     spark.sql(qry).show();
   }
