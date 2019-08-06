@@ -1,0 +1,55 @@
+<workflow-app name="JavaAction" xmlns="uri:oozie:workflow:0.1">
+   <start to="javaAction"/>
+
+   <action name='javaAction'>
+        <java>
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <configuration>
+               <property>
+                    <name>mapred.job.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <main-class>org.apach.oozie.test.MyTest</main-class>
+            <capture-output/>
+        </java>
+        <ok to="mydecision"/>
+        <error to="killAction"/>
+    </action>
+
+   <decision name="mydecision">
+       <switch>
+           <case to="ssh2Action">${(wf:actionData('javaAction')['GET_KEY'] eq "one")}</case>
+           <case to="mailAction">${(wf:actionData('javaAction')['GET_KEY'] eq "two")}</case>
+           <case to="killAction">${(wf:actionData('javaAction')['GET_KEY'] eq "three")}</case>
+           <default to="end"/>
+       </switch>
+   </decision>
+
+   <action name="ssh2Action">
+      <ssh xmlns="uri:oozie:ssh-action:0.1">
+      <host>${remoteNode}</host>
+      <command>${shellScriptPath}</command>
+      <capture-output/>
+      </ssh>
+   <ok to="end"/>
+   <error to="killAction"/>
+   </action>
+
+   <action name="mailAction">
+      <email xmlns="uri:oozie:email-action:0.1">
+      <to>${emailToAddress}</to>
+      <subject> Output of workflow ${wf:id()}</subject>
+      <body>Status of the file move: ${wf:actionData('sshAction')['STATUS']}</body>
+      </email>
+   <ok to="end"/>
+   <error to="end"/>
+   </action>
+
+   <kill name="killAction">
+      <message>Java action failed, error message[${wf:errorMessage(wf:lastErrorNode())}]</message>
+   </kill>
+
+   <end name="end"/>
+</workflow-app>
