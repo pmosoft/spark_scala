@@ -1,0 +1,9 @@
+<coordinator-app name="hourly-aggregation" frequency="${coord:minutes(10)}"
+start="2019-08-02T08:00Z" end="2019-08-02T09:00Z" timezone="Asia/Seoul"
+xmlns="uri:oozie:coordinator:0.4">
+    <action>
+        <workflow>
+            <app-path>hdfs://nuri02.platform.com:8020/user/shjeong/oozieTest/workflow.xml</app-path>
+        </workflow>
+    </action>
+</coordinator-app>
