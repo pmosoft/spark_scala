@@ -1,0 +1,100 @@
+/**
+ *******************************************************************************
+ * @brief 분석요청
+ *
+ * @remark
+ * @file   SVC_200_1000.pc
+ * @date   2012.12.01
+ * @author Ysic
+ *******************************************************************************
+ */
+EXEC SQL INCLUDE SQLCA;
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "common.h"
+#include "packet.h"
+EXEC SQL INCLUDE "db_table.h";
+
+/**
+ * Function prototype
+ */
+int SVC_200_1000(struct TB_SCHEDULE *tb_schedule, struct ST_SERVER *st_server, int select_server);
+
+/*-------------------------------------------------------------------------------------------------------------*/
+/**
+ * @brief 200-1000 전문송수신
+ */
+int SVC_200_1000(struct TB_SCHEDULE *tb_schedule, struct ST_SERVER *st_server, int select_server)
+{
+    int ret = 0;
+    int inLength = 0;
+    int outLength = 0;
+    char *inMessage;
+    char *outMessage;
+    char ip[20];
+    int  port = 0;
+    struct IO_COMMON   ioCommon;
+    struct IN_200_1000  in_200_1000;
+
+    // 서버IP,PORT설정
+    strcpy(ip, st_server->server_ip[select_server]);
+    port = st_server->server_port[select_server];
+    log_debug(__FFILE__, __FFUNC__, __LINE__, "server_ip   = [%s]", ip);
+    log_debug(__FFILE__, __FFUNC__, __LINE__, "server_port = [%d]", port);
+
+    // 입출력 메모리 할당
+    inMessage = (char *)malloc(LEN_MAX_MESSAGE);
+    if(inMessage == NULL) {
+        log_error(__FFILE__, __FFUNC__, __LINE__, "입력전문 메모리 할당 실패");
+        return FALSE;
+    }
+    outMessage = (char *)malloc(LEN_MAX_MESSAGE);
+    if(outMessage == NULL) {
+        free(inMessage);
+        log_error(__FFILE__, __FFUNC__, __LINE__, "출력전문 메모리 할당 실패");
+        return FALSE;
+    }
+    memset(inMessage, 0x00, LEN_MAX_MESSAGE);
+    memset(outMessage, 0x00, LEN_MAX_MESSAGE);
+
+    memset(&ioCommon   , 0x00, sizeof(ioCommon));
+    memset(&in_200_1000 , 0x00, sizeof(in_200_1000));
+
+    // 전문 공통부조립
+    makeInCommon(&ioCommon, sizeof(struct IN_200_1000), "200", "1000", tb_schedule->user_id);
+
+    // 전문 개별부조립
+    str_rpad_n(in_200_1000.schedule_id, tb_schedule->schedule_id, sizeof(in_200_1000.schedule_id));
+    str_rpad_n(in_200_1000.scenario_id, tb_schedule->scenario_id, sizeof(in_200_1000.scenario_id));
+    strcpy(in_200_1000.type_cd, tb_schedule->type_cd);
+
+    // 전문 조립
+    memcpy(inMessage, &ioCommon, sizeof(ioCommon));
+    memcpy(inMessage + sizeof(ioCommon), &in_200_1000, sizeof(in_200_1000));
+    inLength = sizeof(ioCommon) + sizeof(in_200_1000);
+    str_removeNull(inMessage, inLength);
+
+    // 전문 송수신
+    log_debug(__FFILE__, __FFUNC__, __LINE__, "입력전문 = [%d][%s]", inLength, inMessage);
+    ret = sock_sendMessage(ip, port, inMessage, inLength, outMessage, &outLength);
+    log_debug(__FFILE__, __FFUNC__, __LINE__, "출력전문 = [%d][%s]", outLength, outMessage);
+
+    if(ret == SUCC) {
+        memcpy(&ioCommon, outMessage, sizeof(ioCommon));
+    } else {
+        strcpy(ioCommon.rx_code, "9998");
+    }
+
+    log_info(__FFILE__, __FFUNC__, __LINE__, "사용전문[200-1000], 분석서버[%s] SCHEDULE_ID[%d], SCENARIO_ID[%d], TYPE_CD[%.5s] -> 응답코드[%.4s]"
+        , st_server->server_id[select_server]
+        , tb_schedule->schedule_id
+        , tb_schedule->scenario_id
+        , tb_schedule->type_cd
+        , ioCommon.rx_code
+    );
+
+    free(inMessage);
+    free(outMessage);
+    return ret;
+}

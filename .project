@@ -17,11 +17,6 @@
 	</natures>
 	<linkedResources>
 		<link>
-			<name>doc/eos</name>
-			<type>2</type>
-			<location>D:/eos</location>
-		</link>
-		<link>
 			<name>doc/hadoop</name>
 			<type>2</type>
 			<location>D:/Documents/gdrive/dev/manual/hadoop</location>
