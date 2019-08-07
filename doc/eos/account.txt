@@ -22,7 +22,7 @@ http://150.23.13.202/main.do cell/plan2018
 ------------------------
 https://nmsdosg.sktelecom.com/vpn/index.html
 이재홍 TANGO1148/Tangovdi3!
-강재효 TANGO3046/Tangovdi3!(x)
+강재효 TANGO3046/Tangovdi3!
 
 ------------------------
 -- DB정보
