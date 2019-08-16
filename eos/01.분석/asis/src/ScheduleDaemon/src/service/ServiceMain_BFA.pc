@@ -1,0 +1,320 @@
+/**
+ *******************************************************************************
+ * @brief  ScheduleDaemon의 요청에 대해 업무구분코드와 전문종별코드에 해당하는 서비스를 호출한다.
+ *         업무구분코드와 전문종별코드는 해당문서를 참고
+ * @remark
+ * @code
+ * 1. ./config/test.conf 로 설정파일을 생성. 아래는 설정파일 내용
+ *    log_directory = ${HOME}/log
+ *
+ * 2. 프로그램 시작시 설정파일 초기화
+ *    cfg_loadConfig("./config/test.conf");
+ *
+ * 3. 설정값을 꺼냄
+ *    char *logDirectory = cfg_getString("log_directory");
+ *    printf("로그경로 = [%s] \n", logDirectory);
+ *    출력결과 = {your home directory}/log
+ *
+ * 4. 프로그램 종료시 로딩된 설정내용 메모리 해제
+ *    cfg_closeConfig();
+ * @endcode
+ * @file   ServiceMain.c
+ * @date   2012.12.01
+ * @author Ysic
+ *******************************************************************************
+ */
+EXEC SQL INCLUDE SQLCA;
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "common.h"
+#include "packet.h"
+EXEC SQL INCLUDE "db_table.h";
+
+/**
+ * Function prototype
+ */
+int procSchedule_SC051(struct ST_SERVER *st_server, struct ST_ANALYSIS_WEIGHT *st_analysis_weight);
+static int getServerStatus(struct ST_SERVER *st_server);
+static int selectAnalysisServer(int schedule_id, int scenario_id, char* type_cd, struct ST_ANALYSIS_WEIGHT *st_analysis_weight, struct ST_SERVER *st_server);
+
+/*-------------------------------------------------------------------------------------------------------------*/
+/**
+ * @brief SCHEDULE테이블을 읽어 현재 수행할 일에 대한 처리를 한다.
+ * 하루전 ~ 현재까지만 처리 한다.
+ */
+int procSchedule_BFA(struct ST_SERVER *st_server, struct ST_ANALYSIS_WEIGHT *st_analysis_weight)
+{
+    EXEC SQL BEGIN DECLARE SECTION;
+        struct TB_SCHEDULE tb_schedule;
+        char   sqlbuf[LEN_SQL_QUERY];
+    EXEC SQL END DECLARE SECTION;
+
+    int i, ret = 0, select_server;
+
+    memset(sqlbuf, 0x00, sizeof(sqlbuf));
+    sprintf(sqlbuf,
+        "select SCHEDULE_ID             \n"
+        "      ,TYPE_CD                 \n"
+        "      ,SCENARIO_ID             \n"
+        "      ,USER_ID                 \n"
+        "      ,PRIORITIZE              \n"
+        "      ,PROCESS_CD              \n"
+        "      ,PROCESS_MSG             \n"
+        "      ,SCENARIO_PATH           \n"
+        "      ,to_char(REG_DT, 'YYYYMMDDHH24MISS')     \n"
+        "      ,to_char(MODIFY_DT, 'YYYYMMDDHH24MISS')  \n"
+        "  from (select row_number() over(order by SCHEDULE_ID asc, TYPE_CD asc, PRIORITIZE asc, RU_CNT asc) as ROW_NUM \n"
+        "              ,SCHEDULE_ID     \n"
+        "              ,TYPE_CD         \n"
+        "              ,SCENARIO_ID     \n"
+        "              ,USER_ID         \n"
+        "              ,PRIORITIZE      \n"
+        "              ,PROCESS_CD      \n"
+        "              ,PROCESS_MSG     \n"
+        "              ,SCENARIO_PATH   \n"
+        "              ,REG_DT          \n"
+        "              ,MODIFY_DT       \n"
+        "          from SCHEDULE        \n"
+        "         where PROCESS_CD in ('10001') \n"
+        "           and TYPE_CD in ('SC051') \n"
+        "       )                       \n"
+        " where ROW_NUM <= 2            \n"
+        " order by ROW_NUM                "
+    );
+    log_debug(__FFILE__, __FFUNC__, __LINE__, "BFA QUERY [%s]", sqlbuf);
+
+    EXEC SQL PREPARE pre_select_SCHEDULE FROM :sqlbuf;
+    if(SQLCODE != SQLSUCCESS)
+    {
+        log_error(__FFILE__, __FFUNC__, __LINE__, "SQLCODE = [%d]", SQLCODE);
+        return FAIL;
+    }
+    EXEC SQL DECLARE cur_select_SCHEDULE SCROLL CURSOR FOR pre_select_SCHEDULE;
+    if(SQLCODE != SQLSUCCESS)
+    {
+        log_error(__FFILE__, __FFUNC__, __LINE__, "SQLCODE = [%d]", SQLCODE);
+        return SQLCODE;
+    }
+    EXEC SQL OPEN cur_select_SCHEDULE;
+    if(SQLCODE != SQLSUCCESS)
+    {
+        log_error(__FFILE__, __FFUNC__, __LINE__, "SQLCODE = [%d]", SQLCODE);
+        return SQLCODE;
+    }
+
+    while(1)
+    {
+        memset(&tb_schedule, 0x00, sizeof(tb_schedule));
+        EXEC SQL FETCH NEXT cur_select_SCHEDULE INTO :tb_schedule;
+        if(!(SQLCODE == SQLSUCCESS || SQLCODE == SQLNOTFOUND))
+        {
+            // 에러처리
+            log_error(__FFILE__, __FFUNC__, __LINE__, "SQLCODE = [%d]", SQLCODE);
+            EXEC SQL CLOSE cur_select_SCHEDULE;
+            return FAIL;
+        }
+        else if(SQLCODE == SQLNOTFOUND)
+        {
+            // no more data. 처리대상 없음
+            log_debug(__FFILE__, __FFUNC__, __LINE__, "처리할 스케줄이 없습니다.");
+            break;
+        }
+        log_debug(__FFILE__, __FFUNC__, __LINE__, "schedule_id    = [%d]", tb_schedule.schedule_id  );
+        log_debug(__FFILE__, __FFUNC__, __LINE__, "type_cd        = [%s]", tb_schedule.type_cd  );
+        log_debug(__FFILE__, __FFUNC__, __LINE__, "scenario_id    = [%d]", tb_schedule.scenario_id  );
+        log_debug(__FFILE__, __FFUNC__, __LINE__, "user_id        = [%s]", tb_schedule.user_id      );
+        log_debug(__FFILE__, __FFUNC__, __LINE__, "prioritize     = [%s]", tb_schedule.prioritize   );
+        log_debug(__FFILE__, __FFUNC__, __LINE__, "process_cd     = [%s]", tb_schedule.process_cd   );
+
+        // 분석 서버 선정하기
+        select_server = selectAnalysisServer(tb_schedule.schedule_id, tb_schedule.scenario_id, tb_schedule.type_cd, st_analysis_weight, st_server);
+
+        if(select_server >= 0)
+        {
+            // 스케줄 분석중 으로 상태 업데이트
+            ret = lf_updateScheduleProcessCode(tb_schedule.schedule_id, "10002", NULL);
+            if(ret != SUCC) {
+                // 오류처리
+                lf_updateScheduleProcessCode(tb_schedule.schedule_id, "10009", NULL);
+                db_transactionCommit();
+                continue;
+            }
+            db_transactionCommit();
+
+            // TYPE_CD별 분기
+            if(memcmp(tb_schedule.type_cd, "SC051", 5) == 0)
+            {
+                ret = SVC_200_1000(&tb_schedule, st_server, select_server);
+            }
+            else {
+                log_error(__FFILE__, __FFUNC__, __LINE__, "지원하지 않는 SCHEDULE 입니다.[%d][%s]", tb_schedule.schedule_id, tb_schedule.type_cd);
+                // 오류처리
+                lf_updateScheduleProcessCode(tb_schedule.schedule_id, "10009", NULL);
+                db_transactionCommit();
+                continue;
+            }
+
+            // 분석요청
+            if(ret != SUCC) {
+                log_error(__FFILE__, __FFUNC__, __LINE__, "분석요청 후 에러 발생");
+                // 오류처리
+                lf_updateScheduleProcessCode(tb_schedule.schedule_id, "10009", NULL);
+                db_transactionCommit();
+                continue;
+            }
+            db_transactionCommit();
+
+            sleep(2);
+        }
+    }
+    EXEC SQL CLOSE cur_select_SCHEDULE;
+
+    return SUCC;
+}
+
+/**
+ * @brief 요청된 분석 요청에 대한 서버 상태 확인
+ */
+static int getServerStatus(struct ST_SERVER *st_server)
+{
+    EXEC SQL BEGIN DECLARE SECTION;
+        int     szSCHEDULE_COUNT       ;
+        int     szANALYSIS_WEIGHT      ;
+        varchar szSERVER_ID    [ 10 +1];
+    EXEC SQL END DECLARE SECTION;
+
+    int i;
+
+    for(i=0; i<st_server->server_cnt; i++)
+    {
+        memset(szSERVER_ID.arr , 0x00 , sizeof(szSERVER_ID.arr));
+        memcpy(szSERVER_ID.arr , st_server->server_id[i], strlen(st_server->server_id[i]));
+        szSERVER_ID.len = strlen(st_server->server_id[i]);
+
+        // Swing 분석 2015-06-17
+        EXEC SQL
+            select nvl(count(ANALYSIS_WEIGHT) , 0) ,
+                   nvl(sum(ANALYSIS_WEIGHT)   , 0)
+              into :szSCHEDULE_COUNT               ,
+                   :szANALYSIS_WEIGHT
+              from SCHEDULE
+             where SERVER_ID   = :szSERVER_ID
+               and TYPE_CD     in ('SC051')
+               and PROCESS_CD  = '10003'
+             group by SERVER_ID
+            ;
+
+        if(SQLCODE == SQLNOTFOUND)
+        {
+            st_server->schedule_count[i] = 0;
+            st_server->total_weight[i]   = 0;
+        }
+        else if(SQLCODE != SQLSUCCESS)
+        {
+            log_error(__FFILE__, __FFUNC__, __LINE__, "SQLCODE = [%d]", SQLCODE);
+            return SQLCODE;
+        }
+        else
+        {
+            st_server->schedule_count[i] = szSCHEDULE_COUNT  ;
+            st_server->total_weight[i]   = szANALYSIS_WEIGHT ;
+        }
+
+        log_debug(__FFILE__, __FFUNC__, __LINE__, "szSERVER_ID        [%s]", szSERVER_ID.arr              );
+        log_debug(__FFILE__, __FFUNC__, __LINE__, "szSCHEDULE_COUNT   [%d]", st_server->schedule_count[i] );
+        log_debug(__FFILE__, __FFUNC__, __LINE__, "szANALYSIS_WEIGHT  [%d]", st_server->total_weight[i]   );
+    }
+
+    return 0;
+}
+
+/*-------------------------------------------------------------------------------------------------------------*/
+/**
+ * @brief 요청된 분석 요청에 대한 기능 가중치 계산
+ */
+static int selectAnalysisServer(int schedule_id, int scenario_id, char* type_cd, struct ST_ANALYSIS_WEIGHT *st_analysis_weight, struct ST_SERVER *st_server)
+{
+    int  kind_weight, ru_count, bin_count, org_ru_count, org_bin_count, bin_x_count, bin_y_count;
+    int  analysis_weight;
+    int  i, max, select_server;
+    int  max_analysis_count_SC051 = cfg_getInt("max_analysis_count_SC051");
+    int  min_server;
+
+    // 분석종류 확인 및 가중치 계산
+    computeAnalysisKind(scenario_id, &kind_weight);
+    log_debug(__FFILE__, __FFUNC__, __LINE__, "kind_weight  [%d]", kind_weight );
+
+    // RU 개수 확인
+    selectRuCount(scenario_id, &ru_count);
+    log_debug(__FFILE__, __FFUNC__, __LINE__, "ru_count     [%d]", ru_count    );
+
+    // Bin 개수 확인
+    selectBinCount(scenario_id, &bin_count, &bin_x_count, &bin_y_count);
+    log_debug(__FFILE__, __FFUNC__, __LINE__, "bin_count    [%d]", bin_count   );
+    log_debug(__FFILE__, __FFUNC__, __LINE__, "bin_x_count  [%d]", bin_x_count   );
+    log_debug(__FFILE__, __FFUNC__, __LINE__, "bin_y_count  [%d]", bin_y_count   );
+
+    org_ru_count  = ru_count  ;
+    org_bin_count = bin_count ;
+
+    // 분석 기능에 대한 가중치 계산
+    if(ru_count < st_analysis_weight->ru_unit)      ru_count    = st_analysis_weight->ru_unit   ;
+    if(bin_count < st_analysis_weight->bin_unit)    bin_count   = st_analysis_weight->bin_unit  ;
+
+    analysis_weight = kind_weight
+            * ( (ru_count / st_analysis_weight->ru_unit * st_analysis_weight->ru_weight)
+              + (bin_count / st_analysis_weight->bin_unit * st_analysis_weight->bin_weight));
+/*
+    log_debug(__FFILE__, __FFUNC__, __LINE__, "kind_weight                    [%d]", kind_weight                    );
+    log_debug(__FFILE__, __FFUNC__, __LINE__, "ru_count                       [%d]", ru_count                       );
+    log_debug(__FFILE__, __FFUNC__, __LINE__, "st_analysis_weight->ru_unit    [%d]", st_analysis_weight->ru_unit    );
+    log_debug(__FFILE__, __FFUNC__, __LINE__, "st_analysis_weight->ru_weight  [%d]", st_analysis_weight->ru_weight  );
+    log_debug(__FFILE__, __FFUNC__, __LINE__, "(ru_count / st_analysis_weight->ru_unit * st_analysis_weight->ru_weight)   [%d]", (ru_count / st_analysis_weight->ru_unit * st_analysis_weight->ru_weight)   );
+    log_debug(__FFILE__, __FFUNC__, __LINE__, "bin_count                      [%d]", bin_count                      );
+    log_debug(__FFILE__, __FFUNC__, __LINE__, "st_analysis_weight->bin_unit   [%d]", st_analysis_weight->bin_unit   );
+    log_debug(__FFILE__, __FFUNC__, __LINE__, "st_analysis_weight->bin_weight [%d]", st_analysis_weight->bin_weight );
+    log_debug(__FFILE__, __FFUNC__, __LINE__, "(bin_count / st_analysis_weight->bin_unit * st_analysis_weight->bin_weight) [%d]", (bin_count / st_analysis_weight->bin_unit * st_analysis_weight->bin_weight) );
+*/
+    log_debug(__FFILE__, __FFUNC__, __LINE__, "analysis_weight [%d]", analysis_weight);
+
+    log_debug(__FFILE__, __FFUNC__, __LINE__, "type_cd [%s]", type_cd);
+
+    // 서버 가용 상태 확인
+    getServerStatus(st_server);
+
+    max = -99999999;
+    select_server = -1;
+    min_server = -1;
+
+    for(i=0; i<st_server->server_cnt; i++)
+    {
+    	if (memcmp(type_cd, "SC051", 5) == 0)
+		{
+	        if(st_server->schedule_count[i] < max_analysis_count_SC051)
+	        {
+				if (i == 0)
+				{
+					min_server = 0;
+				}
+				else
+				{
+					if (st_server->schedule_count[i] < st_server->schedule_count[i-1])
+					{
+						min_server = i;
+					}
+				}
+			}
+		}
+    }
+
+    select_server = min_server;
+
+    if( select_server != -1 ) {
+        update_schedule(schedule_id, st_server->server_id[select_server], org_ru_count, bin_x_count, bin_y_count, analysis_weight);
+    }
+    log_debug(__FFILE__, __FFUNC__, __LINE__, "select_server = [%d]", select_server);
+
+    return select_server;
+}
+
