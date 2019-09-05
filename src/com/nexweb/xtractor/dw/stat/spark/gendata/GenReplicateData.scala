@@ -36,7 +36,7 @@ object GenReplicateData {
       System.exit(1)
     }
 
-    val arg1 = args(0)
+    val arg1 = args(0) 
     val arg2 = args(1)
     val arg3 = args(2)
     val arg4 = args(3)
