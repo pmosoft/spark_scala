@@ -5,7 +5,6 @@ import org.apache.spark.sql.types._
 import org.apache.hadoop.fs.FileSystem
 import org.apache.hadoop.fs.Path
 import biz.dmsoft.str.schema.load.RuntimeLoader
-import biz.dmsoft.str.comm.App
 
 /*
  * SparkEtl pathNm tabNm
