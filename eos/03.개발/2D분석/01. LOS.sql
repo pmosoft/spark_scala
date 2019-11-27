@@ -53,7 +53,7 @@ select max(AREA.scenario_id) as scenario_id,
        max(AREA.schedule_id) as schedule_id
   from AREA, RESULT_NR_2D_LOS_RU RSLT
  where RSLT.schedule_id = AREA.schedule_id
- and RSLT.ru_id = 1012253245
+-- and RSLT.ru_id = 1012253245
    and AREA.tm_startx <= RSLT.rx_tm_xpos div AREA.resolution * AREA.resolution and RSLT.rx_tm_xpos div AREA.resolution * AREA.resolution < AREA.tm_endx
    and AREA.tm_starty <= RSLT.rx_tm_ypos div AREA.resolution * AREA.resolution and RSLT.rx_tm_ypos div AREA.resolution * AREA.resolution < AREA.tm_endy
   group by RSLT.rx_tm_xpos div AREA.resolution * AREA.resolution, RSLT.rx_tm_ypos div AREA.resolution * AREA.resolution,

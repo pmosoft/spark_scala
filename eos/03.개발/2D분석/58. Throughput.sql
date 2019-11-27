@@ -9,21 +9,19 @@
 --------------------------------------------------------------------------------------------------------------------------
 -- 1. SINR Data Check
 --------------------------------------------------------------------------------------------------------------------------
-select * from RESULT_NR_2D_SINR where schedule_id = 8463189;
+select * from RESULT_NR_BF_SINR where schedule_id = 8460965;
 
 
 select * from NRUETRAFFIC
- where scenario_id = 5112167
+ where scenario_id = 5113566
 ;
-
 
 --------------------------------------------------------------------------------------------------------------------------
 -- 2. Throughput Analyze by Scenario Area
 --------------------------------------------------------------------------------------------------------------------------
-alter table RESULT_NR_2D_THROUGHPUT drop partition(schedule_id=8463189);
+alter table RESULT_NR_BF_SINR drop partition(schedule_id=8460965);
 
 set hive.exec.dynamic.partition.mode=nonstrict;
---set hive.execution.engine=tez;
 
 with NR_PARAMETER as -- 파라미터 정보
 (
@@ -52,7 +50,7 @@ select a.scenario_id, b.schedule_id,
             else -1
        end as UELayer         
   from SCENARIO a, SCHEDULE b, NRSYSTEM c, FABASE d, MOBILE_PARAMETER e
- where b.schedule_id = 8463189  
+ where b.schedule_id = 8460965  
    and a.scenario_id = b.scenario_id
    and a.scenario_id = c.scenario_id
    and a.system_id = d.systemtype
@@ -85,7 +83,7 @@ select a.scenario_id, a.schedule_id,
 ),
 THROUGHPUTtemp as
 (
-select a.scenario_id, a.schedule_id, a.rx_tm_xpos, a.rx_tm_ypos, a.x_point, a.y_point,
+select a.schedule_id, a.tbd_key, a.rx_tm_xpos, a.rx_tm_ypos, a.rx_floorz,
        a.sinr as dSNR,
        b.dSINROffset,
        b.modulation1, b.modulation2, b.modulation3, b.modulation4, b.modulation5, 
@@ -283,12 +281,12 @@ select a.scenario_id, a.schedule_id, a.rx_tm_xpos, a.rx_tm_ypos, a.x_point, a.y_
                    a.sinr  + (abs(if(b.snr1 + b.dSINROffset < a.sinr, b.snr1 + b.dSINROffset, a.sinr)) + 1.)
              else  a.sinr
          end as dValue1
-  from RESULT_NR_2D_SINR a, NR_DLTRAFFIC b
- where a.schedule_id = 8463189
+  from RESULT_NR_BF_SINR a, NR_DLTRAFFIC b
+ where a.schedule_id = 8460965
    and a.schedule_id = b.schedule_id
 )
-insert into RESULT_NR_2D_THROUGHPUT partition (schedule_id)
-select a.scenario_id, a.rx_tm_xpos, a.rx_tm_ypos, a.x_point, a.y_point,
+insert into RESULT_NR_BF_THROUGHPUT partition (schedule_id)
+select a.tbd_key, a.rx_tm_xpos, a.rx_tm_ypos, a.rx_floorz,
        cast(
        case when a.dSNR >= a.snr15 + a.dSINROffset then
                    a.thp15
@@ -328,12 +326,12 @@ select a.scenario_id, a.rx_tm_xpos, a.rx_tm_ypos, a.x_point, a.y_point,
 ;
 
 -- Check Result Data
-select * from RESULT_NR_2D_THROUGHPUT where schedule_id = 8463189;
+select * from RESULT_NR_BF_THROUGHPUT where schedule_id = 8460965;
 
 
 --------------------------------------------------------------------------------------------------------------------------
 -- 3. Export Result Data (for Test)
 --------------------------------------------------------------------------------------------------------------------------
-hive -e "select * from RESULT_NR_2D_THROUGHPUT where schedule_id = 8463189;" | sed 's/[[:space:]]\+/,/g' > throughput_test.csv
+hive -e "select * from RESULT_NR_BF_THROUGHPUT where schedule_id = 8460965;" | sed 's/[[:space:]]\+/,/g' > throughput_bf_test.csv
 
 ---------------------------------------------------------E-N-D---------------------------------------------------------------------------

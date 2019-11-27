@@ -1,0 +1,124 @@
+BIN단위 LOS 2D기준 분석결과 연동(PostGIS -> Hive)
+=================================================
+BIN단위분석결과: 스케줄ID / BIN_ID / 수신점tm_xpos / 수신점tm_ypos / 수신점해발고도 / resolution / 수신점los여부 / theta / phi/ RU_ID / 송신점tm_xpos / 송신점tm_ypos / 송신점tz / 건물여부 / 스케줄ID
+RU별고도및건물평균높이: 스케줄ID / RU_ID / 송신점해발고도 / 건물평균높이 /
+
+o in PostGIS,
+CREATE TABLE public.los_eng_result (
+        job_id text NULL,
+        schedule_id int4 NULL, -- 스케줄ID
+        ru_id text NULL,       -- RU Unique키
+--      bin_id text NULL,
+        bin_x float8 NULL,     -- BIN의 X좌표(TM좌표)
+        bin_y float8 NULL,     -- BIN의 Y좌표(TM좌표)
+        bin_z float8 NULL,     -- BIN의 해발고도(meter)
+        bld_id int4 NULL,
+        los bool NULL,         -- LOS여부(1, 0)
+        in_bld bool NULL,      -- 수신점BIN이 건물에 포함되어 있는지 여부
+        theta_deg int4 NULL,   -- 송신점과 수신점간의 정북을 기준으로 반시계 방향으로 측정한 degree 각도
+        phi_deg int4 NULL      -- 송신점과 수신점간의 송신점이 수직일때를 기준으로 Tilt각도를 측정한 degree 각도
+--      sector_x float8 NULL,
+--      sector_y float8 NULL,
+--      sector_z float8 NULL
+);
+
+o in Hive,
+CREATE EXTERNAL TABLE RESULT_NR_2D_LOS_RU
+(
+--    SCENARIO_ID int,
+--    BIN_ID string,
+    RX_TM_XPOS int,          -- BIN의 X좌표(TM좌표)
+    RX_TM_YPOS int,          -- BIN의 Y좌표(TM좌표)
+    RZ float,                -- BIN의 해발고도(meter)
+--    RESOLUTION int,
+    VALUE int,               -- LOS여부(1, 0)
+    THETA float,             -- 송신점과 수신점간의 정북을 기준으로 반시계 방향으로 측정한 degree 각도
+    PHI float,               -- 송신점과 수신점간의 송신점이 수직일때를 기준으로 Tilt각도를 측정한 degree 각도
+    RU_ID string,            -- RU Unique키
+--    TX_TM_XPOS float,
+--    TX_TM_YPOS float,
+--    TZ float,
+    IS_BLD string             -- 수신점BIN이 건물에 포함되어 있는지 여부를 체크(t, f)
+)
+partitioned BY (SCHEDULE_ID int)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY '|'
+LINES TERMINATED BY '\n'
+STORED AS PARQUET
+LOCATION '/TEOS/warehouse/RESULT_NR_2D_LOS_RU/'
+;
+
+CREATE EXTERNAL TABLE SCENARIO_NR_RU_AVG_HEIGHT
+(
+    ENB_ID int,
+    PCI int,
+    PCI_PORT int,
+    RU_ID string,
+    AvgBuildingHeight float,
+    TxTotalHeight float,
+--    MODEL string
+)
+partitioned BY (SCENARIO_ID int)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY '|'
+LINES TERMINATED BY '\n'
+STORED AS TEXTFILE
+LOCATION '/TEOS/warehouse/SCENARIO_NR_RU_AVG_HEIGHT/'
+;
+
+o 연동 흐름
+      PostGIS                        Hive
+ +---------------------+      +-------------------+
+ |public.los_eng_result| ---> |RESULT_NR_2D_LOS_RU|
+ +---------------------+      +-------------------+
+
+NOTE. schedule_id 별로 분석된 LOS 결과 PostGIS에서 Hive로 데이터 연동
+
+
+
+BIN단위 LOS 3D 기준(PostGIS -> Hive)
+====================================
+o in PostGIS,
+CREATE TABLE public.los_bld_result (
+        schedule_id int4 NULL,  -- 스케줄ID
+        ru_id text NULL,        -- RU Unique키
+        tbd text NULL,          -- 건물 Unique키
+        floor_x float8 NULL,,   -- BIN의 X좌표(TM좌표)
+        floor_y float8 NULL,    -- BIN의 Y좌표(TM좌표)
+        floor_z int NULL,       -- BIN의 건물층
+        floor_dem float null,   -- BIN의 해발고도+건물높이(meter)
+        theta_deg float null,,  -- 송신점과 수신점간의 정북을 기준으로 반시계 방향으로 측정한 degree 각도
+        phi_deg float null,     -- 송신점과 수신점간의 송신점이 수직일때를 기준으로 Tilt각도를 측정한 degree 각도
+        los bool NULL           -- LOS여부(1, 0)
+);
+
+o in Hive,
+CREATE EXTERNAL TABLE RESULT_NR_BF_LOS_RU
+(
+    RU_ID string,        -- RU Unique키
+    TBD_KEY string,      -- 건물 Unique키
+    RX_TM_XPOS float,    -- BIN의 X좌표(TM좌표)
+    RX_TM_YPOS float,    -- BIN의 Y좌표(TM좌표)
+    RX_FLOOR int,        -- BIN의 건물층
+    RX_GBH float,        -- BIN의 해발고도+건물높이(meter)
+    THETA float,         -- 송신점과 수신점간의 정북을 기준으로 반시계 방향으로 측정한 degree 각도
+    PHI float,           -- 송신점과 수신점간의 송신점이 수직일때를 기준으로 Tilt각도를 측정한 degree 각도
+    VALUE int            -- LOS여부(1, 0)
+)
+partitioned BY (SCHEDULE_ID int)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY '|'
+LINES TERMINATED BY '\n'
+STORED AS PARQUET
+LOCATION '/TEOS/warehouse/RESULT_NR_BF_LOS_RU/'
+;
+
+o 연동 흐름
+      PostGIS                        Hive
+ +---------------------+      +-------------------+
+ |public.los_bld_result| ---> |RESULT_NR_BF_LOS_RU|
+ +---------------------+      +-------------------+
+
+NOTE. schedule_id 별로 분석된 LOS 결과 PostGIS에서 Hive로 데이터 연동
+
+

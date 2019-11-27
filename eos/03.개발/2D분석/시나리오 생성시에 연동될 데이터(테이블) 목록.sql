@@ -1,3 +1,42 @@
+----------------------------------------------------------------------------------------------------------------
+-- 1. 시나리오 생성시에 Hive로 연동될 데이터(테이블) 목록
+----------------------------------------------------------------------------------------------------------------
+       ORACLE                        Hive
+ +------------------+          +------------------+
+ |SCENARIO          |          |SCENARIO          |:scenario_id
+ |SCHEDULE          |          |SCHEDULE          |:schedule_id
+ |DU                |          |DU                |:scenario_id
+ |RU                |          |RU                |:scenario_id
+ |SITE              |--------->|SITE              |:scenario_id
+ |NRSYSTEM          |          |NRSYSTEM          |:scenario_id
+ |NRSECTORPARAMETER |          |NRSECTORPARAMETER |:scenario_id
+ |MOBILE_PARAMETER  |          |MOBILE_PARAMETER  |:scenario_id
+ |NRUETRAFFIC       |          |NRUETRAFFIC       |:scenario_id
+ +------------------+          +------------------+
+
+ +------------------+
+ |SCENARIO          |
+ |DU                |          +------------------+
+ |RU                |--------->|SCENARIO_NR_RU    |:scenario_id
+ |SITE              |          +------------------+
+ +------------------+
+
+ +------------------+
+ |RU_ANTENA         |          +-------------------+
+ |ANTENABASE        |--------->|SCENARIO_NR_ANTENNA|:scenario_id
+ |RU                |          +-------------------+
+ +------------------+
+
+     PostGIS
+ +---------------------+       +-------------------------+
+ |SCENARIO_NR_RU_DEM   | ----> |SCENARIO_NR_RU_AVG_HEIGHT|:scenario_id
+ +---------------------+       +-------------------------+
+
+ +---------------------+       +-------------------+
+ |public.los_eng_result| ----> |RESULT_NR_2D_LOS_RU|:schedule_id
+ +---------------------+       +-------------------+
+
+----------------------------------------------------------------------------------------------------------------------------------------
 -- 시나리오 : SCENARIO(ORACLE & HIVE) <= Oracle, Hive에 모두 테이블이 존재함( Oracle -> Hive로 데이터 연동)
 select * from SCENARIO
  where scenario_id = :scenario_id
@@ -18,6 +57,24 @@ SELECT * FROM RU
 ;
 
 SELECT * FROM SITE
+ where scenario_id = :scenario_id
+;
+
+SELECT * FROM NRSYSTEM
+ where scenario_id = :scenario_id;
+;
+
+select * from NRSECTORPARAMETER
+ where scenario_id = :scenario_id;
+;
+
+-- 수신점 파라미터 정보 : MOBILE_PARAMETER(ORACLE & HIVE)
+SELECT * FROM MOBILE_PARAMETER
+ WHERE scenario_id = :scenario_id
+;
+
+-- Throughput 산출관련 파라미터 정보
+select * from NRUETRAFFIC
  where scenario_id = :scenario_id
 ;
 
@@ -115,15 +172,19 @@ select ANTENA.SCENARIO_ID
    AND TRU.RU_ID = ANTENA.RU_ID
 ;
 
--- 수신점 파라미터 정보 : MOBILE_PARAMETER(ORACLE & HIVE)
-SELECT * FROM MOBILE_PARAMETER
- WHERE scenario_id = :scenario_id
-;
 
--- Throughput 산출관련 파라미터 정보
-select * from NRUETRAFFIC
+-- 시나리오에 속한 RU의 Tz + 반경내 건물 평균 높이(meter) : SCENARIO_NR_RU_AVG_HEIGHT(Hive) <= Hive에만 테이블이 존재함
+-- PostGIS에만 존재, Oracle DB에는 없음.
+SELECT * FROM SCENARIO_NR_RU_AVG_HEIGHT
  where scenario_id = :scenario_id
 ;
+
+SELECT * FROM RESULT_NR_2D_LOS_RU
+ WHERE schedule_id := schedule_id
+
+----------------------------------------------------------------------------------------------------------------
+-- 2. 배치 연동 정보
+----------------------------------------------------------------------------------------------------------------
 
 -- FABASE (ORACLE & HIVE)
 배치로 연동 필요
@@ -217,4 +278,17 @@ end;
 
 SELECT * FROM NRPARAMETER_ANT_MAKER;
 
+----------------------------------------------------------------------------------------------------------------------------------------
+
+-- Oracle의 2D bin Count 계산시 사용될 SQL
+select a.tm_startx, a.tm_starty, a.tm_endx, a.tm_endy,
+       ceil((trunc(nvl(a.tm_endx, 0)) - trunc(nvl(a.tm_startx, 0))) / nvl(a.resolution, 10)), -- X count
+       ceil((trunc(nvl(a.tm_endy, 0)) - trunc(nvl(a.tm_starty, 0))) / nvl(a.resolution, 10)), -- Y count
+       b.bin_x_cnt, b.bin_y_cnt
+  from scenario a, schedule b
+ where b.schedule_id = 8460970
+   and a.scenario_id = b.scenario_id
+/
+
+----------------------------------------------------------------------------------------------------------------------------------------
 
